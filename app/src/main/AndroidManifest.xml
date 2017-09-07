@@ -13,7 +13,7 @@
  See the License for the specific language governing permissions and
  limitations under the License.-->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.android.classicalmusicquiz">
+          package="com.example.android.classicalmusicquiz">
 
     <application
         android:allowBackup="true"
@@ -24,13 +24,29 @@
         android:theme="@style/AppTheme">
         <activity android:name=".MainActivity">
             <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
+                <action android:name="android.intent.action.MAIN"/>
 
-                <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
-        <activity android:name=".QuizActivity"
+        <activity
+            android:name=".QuizActivity"
             android:launchMode="singleTop"/>
+
+        <service
+            android:name=".PlayerService"
+            >
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
+                <action android:name="android.media.AUDIO_BECOMING_NOISY" />
+            </intent-filter>
+        </service>
+        <receiver android:name="android.support.v4.media.session.MediaButtonReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_BUTTON"/>
+                <action android:name="android.media.AUDIO_BECOMING_NOISY"/>
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>
