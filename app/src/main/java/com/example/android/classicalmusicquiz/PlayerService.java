@@ -1,29 +1,25 @@
 package com.example.android.classicalmusicquiz;
 
-import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Binder;
-import android.os.Bundle;
 import android.os.IBinder;
-import android.service.media.MediaBrowserService;
-import android.support.annotation.IntDef;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
-import android.support.v4.media.MediaBrowserCompat;
-import android.support.v4.media.MediaBrowserServiceCompat;
-import android.support.v4.media.session.MediaButtonReceiver;
+
+
+import androidx.annotation.Nullable;
+import androidx.core.app.NotificationCompat;
+import androidx.core.app.NotificationManagerCompat;
+import androidx.media.session.MediaButtonReceiver;
+
 import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
-import android.support.v7.app.NotificationCompat;
 import android.util.Log;
 
 import com.google.android.exoplayer2.DefaultLoadControl;
 import com.google.android.exoplayer2.ExoPlaybackException;
-import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.ExoPlayerFactory;
 import com.google.android.exoplayer2.LoadControl;
 import com.google.android.exoplayer2.PlaybackParameters;
@@ -40,8 +36,6 @@ import com.google.android.exoplayer2.trackselection.TrackSelector;
 import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
 import com.google.android.exoplayer2.util.Util;
 
-import java.util.List;
-
 /**
  * Created by fahime on 8/19/17.
  */
@@ -51,6 +45,7 @@ public class PlayerService extends Service implements Player.EventListener {
     private SimpleExoPlayer mExoPlayer;
     private MediaSessionCompat mMediaSession;
     private PlaybackStateCompat.Builder mStateBuilder;
+    private NotificationManagerCompat notificationManagerCompat;
     private boolean isBounded;
     private Uri mediaUri = null;
 
@@ -134,11 +129,13 @@ public class PlayerService extends Service implements Player.EventListener {
      * and media controller.
      */
     private void initializeMediaSession() {
-
+        Intent mediaButtonIntent = new Intent(Intent.ACTION_MEDIA_BUTTON);
+        mediaButtonIntent.setClass(this, MediaButtonReceiver.class);
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(this, 0, mediaButtonIntent, 0);
         // Create a MediaSessionCompat.
         ComponentName mediaButtonReceiver = new ComponentName(getApplicationContext(), MediaButtonReceiver.class);
 
-        mMediaSession = new MediaSessionCompat(this, LOG_TAG, mediaButtonReceiver, null);
+        mMediaSession = new MediaSessionCompat(this, LOG_TAG, mediaButtonReceiver, pendingIntent);
 
         // Enable callbacks from MediaButtons and TransportControls.
         mMediaSession.setFlags(
@@ -146,10 +143,8 @@ public class PlayerService extends Service implements Player.EventListener {
                         MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS);
 
         // Do not let MediaButtons restart the player when the app is not visible.
-        Intent mediaButtonIntent = new Intent(Intent.ACTION_MEDIA_BUTTON);
-        mediaButtonIntent.setClass(this, MediaButtonReceiver.class);
-        PendingIntent pendingIntent = PendingIntent.getBroadcast(this, 0, mediaButtonIntent, 0);
-        mMediaSession.setMediaButtonReceiver(pendingIntent);
+
+//        mMediaSession.setMediaButtonReceiver(pendingIntent);
 
         // Set an initial PlaybackState with ACTION_PLAY, so media buttons can start the player.
         mStateBuilder = new PlaybackStateCompat.Builder()
@@ -174,7 +169,10 @@ public class PlayerService extends Service implements Player.EventListener {
      * @param state The PlaybackState of the MediaSession.
      */
     private void showNotification(PlaybackStateCompat state) {
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(this);
+        notificationManagerCompat = NotificationManagerCompat.from(getBaseContext());
+        String notificationChannelId = Utils.createNotificationChannel(getBaseContext());
+
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this,notificationChannelId);
 
         int icon;
         String play_pause;
@@ -189,13 +187,13 @@ public class PlayerService extends Service implements Player.EventListener {
 
         NotificationCompat.Action playPauseAction = new NotificationCompat.Action(
                 icon, play_pause,
-                MediaButtonReceiver.buildMediaButtonPendingIntent(this,
+                MediaButtonReceiver.buildMediaButtonPendingIntent(getApplicationContext(),
                         PlaybackStateCompat.ACTION_PLAY_PAUSE));
 
-        NotificationCompat.Action restartAction = new android.support.v4.app.NotificationCompat
+        NotificationCompat.Action restartAction = new androidx.core.app.NotificationCompat
                 .Action(R.drawable.exo_controls_previous, getString(R.string.restart),
-                MediaButtonReceiver.buildMediaButtonPendingIntent
-                        (this, PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS));
+               MediaButtonReceiver.buildMediaButtonPendingIntent
+                        (getApplicationContext(), PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS));
 
         PendingIntent contentPendingIntent = PendingIntent.getActivity
                 (this, 0, new Intent(this, QuizActivity.class), 0);
@@ -207,16 +205,14 @@ public class PlayerService extends Service implements Player.EventListener {
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .addAction(restartAction)
                 .addAction(playPauseAction)
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                 .setDeleteIntent(MediaButtonReceiver.buildMediaButtonPendingIntent(getApplicationContext(), PlaybackStateCompat.ACTION_STOP))
-                .setStyle(new NotificationCompat.MediaStyle()
+                .setStyle(new androidx.media.app.NotificationCompat.MediaStyle()
                         .setMediaSession(mMediaSession.getSessionToken())
                         .setShowActionsInCompactView(0, 1));
-        if (state.getState() == PlaybackStateCompat.STATE_PLAYING)
-            startForeground(10, builder.build());
-        else {
-            startForeground(10, builder.build());
-            stopForeground(false);
-        }
+
+        notificationManagerCompat.notify(10, builder.build());
+
     }
 
     /**
@@ -240,10 +236,6 @@ public class PlayerService extends Service implements Player.EventListener {
         mExoPlayer.setPlayWhenReady(true);
     }
 
-    @Override
-    public void onTimelineChanged(Timeline timeline, Object manifest) {
-
-    }
 
     @Override
     public void onTracksChanged(TrackGroupArray trackGroups, TrackSelectionArray trackSelections) {
@@ -284,10 +276,6 @@ public class PlayerService extends Service implements Player.EventListener {
 
     }
 
-    @Override
-    public void onPositionDiscontinuity() {
-
-    }
 
     @Override
     public void onPlaybackParametersChanged(PlaybackParameters playbackParameters) {
